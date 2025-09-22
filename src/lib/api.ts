@@ -14,7 +14,7 @@ async function j<T>(res: Response): Promise<T> {
 }
 
 export async function fetchHospitals(): Promise<HospitalApi[]> {
-  return j(await fetch(`${BASE}/api/hospitals`, { cache: "no-store" }));
+  return j(await fetch(`${BASE}/api/hospital`, { cache: "no-store" }));
 }
 
 export async function fetchInventory(hospitalId: number): Promise<InventoryItemApi[]> {

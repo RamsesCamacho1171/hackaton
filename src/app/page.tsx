@@ -1,46 +1,45 @@
 // app/page.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { useInventoryStore } from "@/lib/store";
-import { getQty, LOW_STOCK } from "@/lib/data";
-import type { StockStatusKey } from "@/lib/data";
+import { useInventoryStore, LOW_STOCK, type StockStatusKey } from "@/lib/store";
 import { DataTable, type MedicineRow } from "@/components/data-table";
 
 type StatusFilter = "all" | StockStatusKey;
 
 export default function InventoryPage() {
-  const { hospitalId, medicines } = useInventoryStore();
-
+  const { hospitalId, inventory, loadInventory } = useInventoryStore();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
 
-  // Adaptamos los datos del store al shape de la tabla
+  // Cargar inventario cuando haya hospital seleccionado
+  useEffect(() => {
+    if (hospitalId) loadInventory();
+  }, [hospitalId, loadInventory]);
+
+  // Adaptar el inventario del store al shape de la tabla
   const rows: MedicineRow[] = useMemo(() => {
-    const list: MedicineRow[] = medicines.map((m) => {
-      const qty = getQty(m, hospitalId);
-      const s: StockStatusKey = qty <= 0 ? "none" : qty < LOW_STOCK ? "low" : "ok";
-      return {
-        id: m.id,
-        name: m.name,
-        presentation: m.presentation,
-        unitPrice: m.unitPrice,
-        qty,
-        status: s,
-      };
-    });
+    const base: MedicineRow[] =
+      inventory.map((it) => ({
+        id: String(it.id),
+        name: it.name,
+        presentation: it.presentation,
+        unitPrice: 0,           // si luego traes precio, cámbialo aquí
+        qty: it.qty,
+        status: it.status,      // ya viene calculado en el store
+      })) ?? [];
 
     // Filtro por texto
     const byText = q
-      ? list.filter((r) =>
-        `${r.name} ${r.presentation ?? ""}`.toLowerCase().includes(q.toLowerCase())
-      )
-      : list;
+      ? base.filter((r) =>
+          `${r.name} ${r.presentation ?? ""}`.toLowerCase().includes(q.toLowerCase())
+        )
+      : base;
 
     // Filtro por estado
     return status === "all" ? byText : byText.filter((r) => r.status === status);
-  }, [medicines, hospitalId, q, status]);
+  }, [inventory, q, status]);
 
   return (
     <section className="space-y-6">

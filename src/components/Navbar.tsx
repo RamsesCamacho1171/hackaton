@@ -3,19 +3,21 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { Hospital, hospitals } from "@/lib/data";
 import { useInventoryStore } from "@/lib/store";
 import { Building2, History, LayoutGrid } from "lucide-react";
 
 export function Navbar() {
-  const { hospitalId, setHospitalId } = useInventoryStore();
+  const {
+    hospitals,          // HospitalApi[] desde el store
+    hospitalId,         // number | null
+    setHospitalId,      // (id: number) => void
+    loadHospitals,      // () => Promise<void>
+  } = useInventoryStore();
 
-  // Garantiza un hospital por defecto al cargar
+  // Carga hospitales al montar; el store selecciona el primero si no hay
   useEffect(() => {
-    if (!hospitalId && hospitals.length > 0) {
-      setHospitalId(hospitals[0].id);
-    }
-  }, [hospitalId, setHospitalId]);
+    loadHospitals();
+  }, [loadHospitals]);
 
   return (
     <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 py-3">
@@ -46,16 +48,21 @@ export function Navbar() {
           <Building2 size={16} />
           Hospital
         </label>
+
         <select
           id="hospital"
           value={hospitalId ?? ""}
-          onChange={(e) => setHospitalId(e.target.value)}
+          onChange={(e) => setHospitalId(Number(e.target.value))}
           className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
           aria-label="Seleccionar hospital"
+          disabled={!hospitals.length}
         >
-          {hospitals.map((h: Hospital) => (
-            <option key={h.id} value={h.id}>
-              {h.name}
+          <option value="" disabled>
+            {hospitals.length ? "Selecciona hospital" : "Cargando..."}
+          </option>
+          {hospitals.map((h) => (
+            <option key={h.id_hospital} value={h.id_hospital}>
+              {h.hospital_name}
             </option>
           ))}
         </select>
