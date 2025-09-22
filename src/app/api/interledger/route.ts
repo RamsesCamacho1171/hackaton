@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PaymentsClient } from "@/back/models/PaymentsClients";
 import { createPrivateKey } from "crypto";
 import { cookies } from "next/headers";
+import { sendEmail } from "@/lib/template";
 
 
 export async function POST(req: Request) {
@@ -75,6 +76,11 @@ export async function POST(req: Request) {
             myWallet,
             key
         }));
+
+        const emailSend = await sendEmail({
+            url_pago:outgoingPaymentGrant.interact.redirect,
+            
+        })
 
         return NextResponse.json({
             stateId,
