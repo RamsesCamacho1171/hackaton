@@ -25,7 +25,7 @@ export function Navbar() {
           🏥
         </span>
         <Link href="/" className="text-lg font-semibold tracking-tight">
-          Inventario
+          VitaLink
         </Link>
         <nav className="ml-4 hidden items-center gap-1 sm:flex">
           <NavLink href="/" icon={<LayoutGrid size={16} />}>
