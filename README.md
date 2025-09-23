@@ -1,5 +1,5 @@
 # VitaLink 
-<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/d16726f4-c637-4f14-8de4-907ca12b0b2f" />
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/d16726f4-c637-4f14-8de4-907ca12b0b2f" />
 
 # What is the problem?
 
