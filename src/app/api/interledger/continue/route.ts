@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PaymentsClient } from "@/back/models/PaymentsClients";
 import { createPrivateKey } from "crypto";
 import { cookies } from "next/headers";
+import { parseToDecimalRight } from "@/lib/utils";
 
 export async function POST(req: Request) {
     try {
@@ -12,6 +13,7 @@ export async function POST(req: Request) {
         const saved = JSON.parse(cookieStore.get(stateId)?.value)
         if (!saved) return NextResponse.json({ error: "stateId inválido o expirado" }, { status: 410 });
 
+        
         const privateKey = createPrivateKey({
             key: Buffer.from(saved.private_key, "base64"),
             format: "der",
@@ -37,11 +39,23 @@ export async function POST(req: Request) {
                 )
                 cookieStore.delete(stateId); // limpiar
 
-                console.log(outgoingPayment);
 
                 //si jala aqui mandamos al api de java
+                const data= {
+                    hospital_id:saved.hospital_id,
+                    distributor_id:saved.distributor_id,
+                    medication_id:saved.medication_id,
+                    quantity:saved.quantity,
+                    totalAmount:parseToDecimalRight(saved.receiveAmount.value),
+                    sourceCurrency:saved.debitAmount.assetCode,
+                    destinationCurrency:saved.receiveAmount.assetCode,
+                    debitAmount:parseToDecimalRight(saved.debitAmount.value),
+                    receiveAmount:parseToDecimalRight(saved.receiveAmount.value)
+
+                }
+
                 return NextResponse.json({
-                    outgoingPayment,
+                    data,
                 });
             }
 

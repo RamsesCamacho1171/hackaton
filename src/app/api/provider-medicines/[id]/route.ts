@@ -1,96 +1,59 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from "next/server"
 
-type Params = { id: string };
+type Params = { id: string }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<Params> }
 ) {
-  const { id } = await params;
-  const data = [
-    {
-      id_provider: 1,
-      id_medicine: 1,
-      provider_name: "Paracetamol SA de CV",
-      price: 10.0,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-    {
-      id_provider: 2,
-      id_medicine: 2,
-      provider_name: "Amoxi Distribuciones S.A.",
-      price: 12.5,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-    {
-      id_provider: 3,
-      id_medicine: 3,
-      provider_name: "Ibuprofenos del Norte",
-      price: 8.75,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-    {
-      id_provider: 4,
-      id_medicine: 4,
-      provider_name: "Metformina Global S.A.",
-      price: 15.2,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-    {
-      id_provider: 5,
-      id_medicine: 5,
-      provider_name: "Losartan y Cía",
-      price: 9.9,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-    {
-      id_provider: 6,
-      id_medicine: 6,
-      provider_name: "Omeprazol Internacional",
-      price: 7.5,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-    {
-      id_provider: 7,
-      id_medicine: 7,
-      provider_name: "AlergiaCare S.A.",
-      price: 4.4,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-    {
-      id_provider: 8,
-      id_medicine: 8,
-      provider_name: "RespiraFarma",
-      price: 18.0,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-    {
-      id_provider: 9,
-      id_medicine: 9,
-      provider_name: "Insulinas del Valle",
-      price: 45.0,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-    {
-      id_provider: 10,
-      id_medicine: 10,
-      provider_name: "Ácido Pharma",
-      price: 3.25,
-      asset_code: "USD",
-      wallet_url: "https://ilp.interledger-test.dev/qwerty",
-    },
-  ];
+  try {
+    const { id } = await params
 
-  const medi = data.filter((m) => m.id_medicine === Number(id));
+    // Validación rápida
+    if (!id || Number.isNaN(Number(id))) {
+      return NextResponse.json(
+        { ok: false, error: "Param id must be a numeric provider id" },
+        { status: 400 }
+      )
+    }
 
-  return NextResponse.json(medi);
+    // Construye la URL upstream y pasa cualquier query extra que venga en la llamada
+    const base =
+      process.env.PROVIDER_MEDICINES_API_URL ??
+      "http://localhost:8081/api/provider-medicines"
+    const upstreamUrl = new URL(`${base}/${encodeURIComponent(id)}`)
+
+    // Si tu endpoint acepta query params (e.g. ?page=1), los propagamos:
+    const { searchParams } = new URL(req.url)
+    searchParams.forEach((v, k) => upstreamUrl.searchParams.set(k, v))
+
+    // Basic Auth (reutiliza las mismas creds)
+    const user = process.env.HOSPITALS_API_USER || "root"
+    const pass = process.env.HOSPITALS_API_PASS || "12345"
+    const authHeader = "Basic " + Buffer.from(`${user}:${pass}`).toString("base64")
+
+    const resp = await fetch(upstreamUrl.toString(), {
+      headers: {
+        Authorization: authHeader,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    })
+
+    if (!resp.ok) {
+      return NextResponse.json(
+        { ok: false, error: "Upstream error", status: resp.status },
+        { status: 502 }
+      )
+    }
+
+    const data = await resp.json()
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json(
+      { ok: false, error: "Internal error" },
+      { status: 500 }
+    )
+  }
 }

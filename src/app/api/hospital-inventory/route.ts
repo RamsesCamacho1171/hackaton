@@ -1,249 +1,77 @@
-import { NextResponse } from "next/server";
-
-type Params = { id: string };
+import { NextResponse } from "next/server"
 
 export async function GET(request: Request) {
-  // 1. Construir objeto URL
-  const { searchParams } = new URL(request.url);
+  try {
+    const { searchParams } = new URL(request.url)
 
-  // 2. Leer hospital_id
-  const hospitalId = searchParams.get("hospital_id");
-  const medicineId = searchParams.get("medicine_id");
+    // Obligatorio
+    const hospitalId = searchParams.get("hospital_id")
+
+    // Aceptamos ambos nombres por compatibilidad: id_medicine (upstream) o medicine_id (cliente)
+    const idMedicine =
+      searchParams.get("id_medicine") ?? searchParams.get("medicine_id")
 
     if (!hospitalId) {
+      return NextResponse.json(
+        { ok: false, error: "El parámetro hospital_id es requerido" },
+        { status: 400 }
+      )
+    }
+
+    // Validación rápida: deben ser números válidos
+    if (Number.isNaN(Number(hospitalId))) {
+      return NextResponse.json(
+        { ok: false, error: "hospital_id debe ser numérico" },
+        { status: 400 }
+      )
+    }
+    if (idMedicine != null && Number.isNaN(Number(idMedicine))) {
+      return NextResponse.json(
+        { ok: false, error: "id_medicine/medicine_id debe ser numérico" },
+        { status: 400 }
+      )
+    }
+
+    // Construir URL hacia el upstream con los NOMBRES que espera:
+    // hospital_id y id_medicine
+    const baseUrl =
+      process.env.HOSPITAL_INVENTORY_API_URL ??
+      "http://localhost:8081/api/hospital-inventory"
+    const upstreamUrl = new URL(baseUrl)
+    upstreamUrl.searchParams.set("hospital_id", String(hospitalId))
+    if (idMedicine != null) {
+      upstreamUrl.searchParams.set("id_medicine", String(idMedicine))
+    }
+
+    // (Opcional) Basic Auth, si tu backend lo requiere como en /api/hospitals
+    const user = process.env.HOSPITALS_API_USER || "root"
+    const pass = process.env.HOSPITALS_API_PASS || "12345"
+    const authHeader = "Basic " + Buffer.from(`${user}:${pass}`).toString("base64")
+
+    const resp = await fetch(upstreamUrl.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: authHeader,
+        Accept: "application/json",
+      },
+      cache: "no-store", // o: next: { revalidate: 60 }
+    })
+
+    if (!resp.ok) {
+      return NextResponse.json(
+        { ok: false, error: "Upstream error", status: resp.status },
+        { status: 502 }
+      )
+    }
+
+    const data = await resp.json()
+    // Si necesitas transformar claves para tu contrato, hazlo aquí antes de responder.
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json(
-      { ok: false, error: "El parámetro hospital_id es requerido" },
-      { status: 400 }
-    );
+      { ok: false, error: "Internal error" },
+      { status: 500 }
+    )
   }
-
-  const data = [
-    {
-      id_hospital: 1,
-      id_medicine: 1,
-      medicine_name: "Paracetamol",
-      presentation: "Tabletas 500mg",
-      quantity: 120,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 2,
-      medicine_name: "Amoxicillin",
-      presentation: "Cápsulas 250mg",
-      quantity: 80,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 3,
-      medicine_name: "Ibuprofen",
-      presentation: "Suspensión 100mg/5ml",
-      quantity: 60,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 4,
-      medicine_name: "Metformin",
-      presentation: "Tabletas 850mg",
-      quantity: 50,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 5,
-      medicine_name: "Losartan",
-      presentation: "Tabletas 50mg",
-      quantity: 90,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 6,
-      medicine_name: "Omeprazole",
-      presentation: "Cápsulas 20mg",
-      quantity: 70,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 7,
-      medicine_name: "Chlorphenamine",
-      presentation: "Tabletas 4mg",
-      quantity: 40,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 8,
-      medicine_name: "Salbutamol",
-      presentation: "Inhalador 100mcg",
-      quantity: 25,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 9,
-      medicine_name: "NPH Insulin",
-      presentation: "Frasco 10ml",
-      quantity: 15,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 10,
-      medicine_name: "Acetylsalicylic Acid",
-      presentation: "Tabletas 100mg",
-      quantity: 200,
-    },
-
-    {
-      id_hospital: 2,
-      id_medicine: 1,
-      medicine_name: "Paracetamol",
-      presentation: "Tabletas 500mg",
-      quantity: 300,
-    },
-    {
-      id_hospital: 2,
-      id_medicine: 2,
-      medicine_name: "Amoxicillin",
-      presentation: "Cápsulas 250mg",
-      quantity: 150,
-    },
-    {
-      id_hospital: 2,
-      id_medicine: 3,
-      medicine_name: "Ibuprofen",
-      presentation: "Suspensión 100mg/5ml",
-      quantity: 75,
-    },
-    {
-      id_hospital: 2,
-      id_medicine: 4,
-      medicine_name: "Metformin",
-      presentation: "Tabletas 850mg",
-      quantity: 100,
-    },
-    {
-      id_hospital: 2,
-      id_medicine: 5,
-      medicine_name: "Losartan",
-      presentation: "Tabletas 50mg",
-      quantity: 85,
-    },
-    {
-      id_hospital: 2,
-      id_medicine: 6,
-      medicine_name: "Omeprazole",
-      presentation: "Cápsulas 20mg",
-      quantity: 110,
-    },
-    {
-      id_hospital: 2,
-      id_medicine: 7,
-      medicine_name: "Chlorphenamine",
-      presentation: "Tabletas 4mg",
-      quantity: 35,
-    },
-    {
-      id_hospital: 2,
-      id_medicine: 8,
-      medicine_name: "Salbutamol",
-      presentation: "Inhalador 100mcg",
-      quantity: 40,
-    },
-    {
-      id_hospital: 2,
-      id_medicine: 9,
-      medicine_name: "NPH Insulin",
-      presentation: "Frasco 10ml",
-      quantity: 20,
-    },
-    {
-      id_hospital: 2,
-      id_medicine: 10,
-      medicine_name: "Acetylsalicylic Acid",
-      presentation: "Tabletas 100mg",
-      quantity: 180,
-    },
-
-    {
-      id_hospital: 3,
-      id_medicine: 1,
-      medicine_name: "Paracetamol",
-      presentation: "Tabletas 500mg",
-      quantity: 250,
-    },
-    {
-      id_hospital: 3,
-      id_medicine: 2,
-      medicine_name: "Amoxicillin",
-      presentation: "Cápsulas 250mg",
-      quantity: 95,
-    },
-    {
-      id_hospital: 3,
-      id_medicine: 3,
-      medicine_name: "Ibuprofen",
-      presentation: "Suspensión 100mg/5ml",
-      quantity: 55,
-    },
-    {
-      id_hospital: 3,
-      id_medicine: 4,
-      medicine_name: "Metformin",
-      presentation: "Tabletas 850mg",
-      quantity: 130,
-    },
-    {
-      id_hospital: 3,
-      id_medicine: 5,
-      medicine_name: "Losartan",
-      presentation: "Tabletas 50mg",
-      quantity: 60,
-    },
-    {
-      id_hospital: 3,
-      id_medicine: 6,
-      medicine_name: "Omeprazole",
-      presentation: "Cápsulas 20mg",
-      quantity: 85,
-    },
-    {
-      id_hospital: 3,
-      id_medicine: 7,
-      medicine_name: "Chlorphenamine",
-      presentation: "Tabletas 4mg",
-      quantity: 45,
-    },
-    {
-      id_hospital: 3,
-      id_medicine: 8,
-      medicine_name: "Salbutamol",
-      presentation: "Inhalador 100mcg",
-      quantity: 30,
-    },
-    {
-      id_hospital: 3,
-      id_medicine: 9,
-      medicine_name: "NPH Insulin",
-      presentation: "Frasco 10ml",
-      quantity: 18,
-    },
-    {
-      id_hospital: 3,
-      id_medicine: 10,
-      medicine_name: "Acetylsalicylic Acid",
-      presentation: "Tabletas 100mg",
-      quantity: 220,
-    },
-    {
-      id_hospital: 1,
-      id_medicine: 12,
-      medicine_name: "fentanilo",
-      presentation: "Tabletas 100mg",
-      quantity: 220,
-    },
-  ];
-
-  let medi = data.filter((m) => m.id_hospital === Number(hospitalId));
-
-  if(medicineId){
-    medi = medi.filter((m) => m.id_medicine === Number(medicineId))
-  }
-
-  return NextResponse.json(medi);
 }

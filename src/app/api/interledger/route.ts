@@ -3,6 +3,7 @@ import { PaymentsClient } from "@/back/models/PaymentsClients";
 import { createPrivateKey } from "crypto";
 import { cookies } from "next/headers";
 import { sendEmail } from "@/lib/template";
+import { parseToDecimalRight } from "@/lib/utils";
 
 export async function POST(req: Request) {
   try {
@@ -15,6 +16,10 @@ export async function POST(req: Request) {
       name_medicam,
       presentation,
       email,
+      hospital_id,
+      distributor_id,
+      medication_id,
+      quantity
     } = await req.json();
 
     const private_key = createPrivateKey({
@@ -85,18 +90,22 @@ export async function POST(req: Request) {
         private_key: privateKey,
         myWallet,
         key,
+        hospital_id,
+        distributor_id,
+        medication_id,
+        quantity
       })
     );
 
     const emailSend = await sendEmail(
       {
         url_pago: outgoingPaymentGrant.interact.redirect,
-        cantidad: value,
+        cantidad: Number(parseToDecimalRight(value)),
         medicamento: name_medicam + "-" + presentation,
         moneda_destino: quote.receiveAmount.assetCode,
         moneda_origen: quote.debitAmount.assetCode,
-        monto_destino: Number(quote.receiveAmount.value),
-        monto_origen: Number(quote.debitAmount.value),
+        monto_destino: Number(parseToDecimalRight(quote.receiveAmount.value)),
+        monto_origen: Number(parseToDecimalRight(quote.debitAmount.value)),
       },
       email
     );
@@ -104,14 +113,7 @@ export async function POST(req: Request) {
     if (emailSend) {
       return NextResponse.json({
         stateId,
-        redirectUrl: outgoingPaymentGrant.interact.redirect,
-        context: {
-          incomingPaymentId: incomingPayment.id,
-          quoteId: quote.id,
-          receiveAmount: quote.receiveAmount,
-          debitAmount: quote.debitAmount,
-          quoteExpiresAt: quote.expiresAt,
-        },
+        message:"Correo enviado exitosamente"
       });
     }
 
