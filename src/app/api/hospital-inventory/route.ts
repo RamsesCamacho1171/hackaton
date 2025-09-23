@@ -2,11 +2,21 @@ import { NextResponse } from "next/server";
 
 type Params = { id: string };
 
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<Params> }
-) {
-  const { id } = await params;
+export async function GET(request: Request) {
+  // 1. Construir objeto URL
+  const { searchParams } = new URL(request.url);
+
+  // 2. Leer hospital_id
+  const hospitalId = searchParams.get("hospital_id");
+  const medicineId = searchParams.get("medicine_id");
+
+    if (!hospitalId) {
+    return NextResponse.json(
+      { ok: false, error: "El parámetro hospital_id es requerido" },
+      { status: 400 }
+    );
+  }
+
   const data = [
     {
       id_hospital: 1,
@@ -220,9 +230,20 @@ export async function GET(
       presentation: "Tabletas 100mg",
       quantity: 220,
     },
+    {
+      id_hospital: 1,
+      id_medicine: 12,
+      medicine_name: "fentanilo",
+      presentation: "Tabletas 100mg",
+      quantity: 220,
+    },
   ];
 
-  const medi = data.filter((m) => m.id_hospital === Number(id));
+  let medi = data.filter((m) => m.id_hospital === Number(hospitalId));
+
+  if(medicineId){
+    medi = medi.filter((m) => m.id_medicine === Number(medicineId))
+  }
 
   return NextResponse.json(medi);
 }

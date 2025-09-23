@@ -18,6 +18,9 @@ export default function InventoryPage() {
     if (hospitalId) loadInventory();
   }, [hospitalId, loadInventory]);
 
+  console.log(inventory);
+  
+
   // Adaptar el inventario del store al shape de la tabla
   const rows: MedicineRow[] = useMemo(() => {
     const base: MedicineRow[] =
