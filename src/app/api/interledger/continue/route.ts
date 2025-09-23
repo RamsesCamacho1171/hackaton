@@ -5,72 +5,102 @@ import { cookies } from "next/headers";
 import { parseToDecimalRight } from "@/lib/utils";
 
 export async function POST(req: Request) {
+  try {
+    const { stateId } = await req.json();
+    if (!stateId)
+      return NextResponse.json({ error: "Falta stateId" }, { status: 400 });
+    console.log("mi codigo", stateId);
+    const cookieStore = await cookies();
+    const saved = JSON.parse(cookieStore.get(stateId)?.value);
+    if (!saved)
+      return NextResponse.json(
+        { error: "stateId inválido o expirado" },
+        { status: 410 }
+      );
+
+    const privateKey = createPrivateKey({
+      key: Buffer.from(saved.private_key, "base64"),
+      format: "der",
+      type: "pkcs8",
+    });
+
+    const client = await PaymentsClient.init({
+      walletAddressUrl: saved.myWallet,
+      privateKey: privateKey,
+      keyId: saved.key,
+    });
+
+    let finalizedOutgoingPaymentGrant;
     try {
-        const { stateId } = await req.json();
-        if (!stateId) return NextResponse.json({ error: "Falta stateId" }, { status: 400 });
-        console.log('mi codigo', stateId);
-        const cookieStore = await cookies();
-        const saved = JSON.parse(cookieStore.get(stateId)?.value)
-        if (!saved) return NextResponse.json({ error: "stateId inválido o expirado" }, { status: 410 });
+      finalizedOutgoingPaymentGrant = await client.continueGrant(
+        saved.continueUri,
+        saved.continueAccessToken
+      );
 
-        
-        const privateKey = createPrivateKey({
-            key: Buffer.from(saved.private_key, "base64"),
-            format: "der",
-            type: "pkcs8",
-        });
+      if (finalizedOutgoingPaymentGrant.access_token) {
+        const outgoingPayment = await client.outgoingPayment(
+          saved.sendWalletAddressId,
+          saved.sendWalletAddressResourceServer,
+          finalizedOutgoingPaymentGrant.access_token.value,
+          saved.quoteId
+        );
+        cookieStore.delete(stateId); // limpiar
 
-        const client = await PaymentsClient.init({
-            walletAddressUrl: saved.myWallet,
-            privateKey: privateKey,
-            keyId: saved.key,
-        });
+        //si jala aqui mandamos al api de java
+        const data = {
+          hospital_id: saved.hospital_id,
+          distributor_id: saved.distributor_id,
+          medication_id: saved.medication_id,
+          quantity: saved.quantity,
+          totalAmount: parseToDecimalRight(saved.receiveAmount.value),
+          sourceCurrency: saved.debitAmount.assetCode,
+          destinationCurrency: saved.receiveAmount.assetCode,
+          debitAmount: parseToDecimalRight(saved.debitAmount.value),
+          receiveAmount: parseToDecimalRight(saved.receiveAmount.value),
+        };
 
-        let finalizedOutgoingPaymentGrant;
         try {
-            finalizedOutgoingPaymentGrant = await client.continueGrant(saved.continueUri, saved.continueAccessToken)
+          // POST al API de Java
+          const resp = await fetch("http://localhost:8081/api/payments", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+          });
 
-            if (finalizedOutgoingPaymentGrant.access_token) {
-                const outgoingPayment = await client.outgoingPayment(
-                    saved.sendWalletAddressId,
-                    saved.sendWalletAddressResourceServer,
-                    finalizedOutgoingPaymentGrant.access_token.value,
-                    saved.quoteId
-                )
-                cookieStore.delete(stateId); // limpiar
-
-
-                //si jala aqui mandamos al api de java
-                const data= {
-                    hospital_id:saved.hospital_id,
-                    distributor_id:saved.distributor_id,
-                    medication_id:saved.medication_id,
-                    quantity:saved.quantity,
-                    totalAmount:parseToDecimalRight(saved.receiveAmount.value),
-                    sourceCurrency:saved.debitAmount.assetCode,
-                    destinationCurrency:saved.receiveAmount.assetCode,
-                    debitAmount:parseToDecimalRight(saved.debitAmount.value),
-                    receiveAmount:parseToDecimalRight(saved.receiveAmount.value)
-
-                }
-
-                return NextResponse.json({
-                    data,
-                });
-            }
-
-            return NextResponse.json({ error: "falta validar" }, { status: 410 });
-
-
-        } catch (error) {
-            console.log(error);
-            cookieStore.delete(stateId);
-            return NextResponse.json({ state: "denied" }, { status: 401 });
-
+          if (resp.ok) {
+            // Si Java responde 200, devolvemos 201 Created
+            return NextResponse.json(
+              { ok: true, message: "Payment created successfully" },
+              { status: 200 }
+            );
+          } else {
+            return NextResponse.json(
+              { ok: false, error: `Java API error`, status: resp.status },
+              { status: 502 }
+            );
+          }
+        } catch (err) {
+          console.error("Error calling Java API:", err);
+          return NextResponse.json(
+            { ok: false, error: "Failed to reach Java API" },
+            { status: 500 }
+          );
         }
+      }
 
-    } catch (e) {
-        console.error(e);
-        return NextResponse.json({ error: "No se pudo continuar el grant" }, { status: 400 });
+      return NextResponse.json({ error: "falta validar" }, { status: 410 });
+    } catch (error) {
+      console.log(error);
+      cookieStore.delete(stateId);
+      return NextResponse.json({ state: "denied" }, { status: 401 });
     }
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json(
+      { error: "No se pudo continuar el grant" },
+      { status: 400 }
+    );
+  }
 }
